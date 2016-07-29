@@ -16,16 +16,16 @@ public class LRUCache <K, V> implements Cache<K, V> {
         cachedItems=new CachedLinkedHashMap<K, V>(maxSize,evictionFactor);
     }
 
-    public void put(K key, V value) {
+    public synchronized void put(K key, V value) {
         cachedItems.put(key,value);
     }
 
-    public V get(K key) {
+    public synchronized V get(K key) {
 
         return cachedItems.get(key);
     }
 
-    public void evict(K key) {
+    public synchronized void evict(K key) {
         cachedItems.remove(key);
     }
 

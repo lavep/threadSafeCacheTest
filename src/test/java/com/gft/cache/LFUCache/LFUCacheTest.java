@@ -4,9 +4,17 @@ import com.gft.cache.Cache;
 import com.gft.cache.lfu.LFUCache;
 import org.junit.Assert;
 import org.junit.Test;
+import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.runner.options.TimeValue;
 
 import java.util.Random;
 import java.util.concurrent.*;
+
+
 
 /**
  * Created by e-papz on 7/26/2016.
@@ -44,21 +52,76 @@ public class LFUCacheTest {
         Assert.assertEquals("test5", cache.get(5));
     }
 
+
+    @Test public void
+    launchBenchmark() throws Exception {
+
+        Options opt = new OptionsBuilder()
+                // Specify which benchmarks to run.
+                // You can be more specific if you'd like to run only one benchmark per test.
+                .include(this.getClass().getName() + ".*")
+                // Set the following options as needed
+                .mode (Mode.AverageTime)
+                .timeUnit(TimeUnit.MICROSECONDS)
+                .warmupTime(TimeValue.seconds(1))
+                .warmupIterations(2)
+                .measurementTime(TimeValue.seconds(1))
+                .measurementIterations(2)
+                .threads(2)
+                .forks(1)
+                .shouldFailOnError(true)
+                .shouldDoGC(true)
+                //.jvmArgs("-XX:+UnlockDiagnosticVMOptions", "-XX:+PrintInlining")
+                //.addProfiler(WinPerfAsmProfiler.class)
+                .build();
+
+        new Runner(opt).run();
+    }
+
+
     @Test
+    @Benchmark
     public void multiThreaded() throws InterruptedException {
-        final Cache<Integer, String> cache = new LFUCache(4, 0.5);
-        ExecutorService executor = Executors.newFixedThreadPool(300);
-        final CountDownLatch latch=new CountDownLatch(300);
-        for (int i = 0; i < 300; i++) {
+        final Cache<Integer, String> cache = new LFUCache(100, 0.5);
+        ExecutorService executor = Executors.newFixedThreadPool(50);
+        final CountDownLatch latch=new CountDownLatch(50);
+        for (int i = 0; i < 15; i++) {
             executor.submit(new Runnable() {
                 public void run() {
                     try {
                         Random rand = new Random();
-                        for (int i = 0; i < 100000; i++) {
-                            int randValue = rand.nextInt(10);
+                        for (int i = 0; i < 10000; i++) {
+                            int randValue = rand.nextInt(200);
                             cache.put(randValue, "test" + randValue);
                             try {
-                                TimeUnit.MICROSECONDS.sleep(2);
+                                TimeUnit.MICROSECONDS.sleep(20);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+
+                         //   String fromCache = cache.get(randValue);
+
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    latch.countDown();
+              //      System.out.println("End");
+                }
+            });
+        }
+
+        for (int i = 0; i < 35; i++) {
+            executor.submit(new Runnable() {
+                public void run() {
+                    try {
+                        Random rand = new Random();
+                        for (int i = 0; i < 10000; i++) {
+                            int randValue = rand.nextInt(10);
+                         //   cache.put(randValue, "test" + randValue);
+                            try {
+                                TimeUnit.MICROSECONDS.sleep(20);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
@@ -71,10 +134,12 @@ public class LFUCacheTest {
                     }
 
                     latch.countDown();
-              //      System.out.println("End");
+                    //      System.out.println("End");
                 }
             });
         }
+
+
         executor.shutdown();
         latch.await();
         Assert.assertEquals(0,latch.getCount());

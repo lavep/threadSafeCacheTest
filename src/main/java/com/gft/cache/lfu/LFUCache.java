@@ -15,6 +15,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * Thread safe LFUCache
  */
+
 public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int maxSize;
@@ -50,9 +51,11 @@ public class LFUCache<K, V> implements Cache<K, V> {
                                 cacheMap.put(key, value);
                                 return;
                             }
+                            addToFrequencyListWith0Frequency(key);
                             try {
+
                                 mapLock.writeLock().lock();
-                                addToFrequencyListWith0Frequency(key);
+
                                 cacheMap.put(key, value);
                             } finally {
                                 mapLock.writeLock().unlock();
@@ -63,9 +66,9 @@ public class LFUCache<K, V> implements Cache<K, V> {
                         }
                     }
                 });
-//        while (!addingToFrequencyTask.isDone()) {
-//            ;
-//        }
+        while (!addingToFrequencyTask.isDone()) {
+            ;
+        }
 
 
     }
