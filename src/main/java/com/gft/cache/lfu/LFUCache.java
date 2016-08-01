@@ -2,8 +2,8 @@ package com.gft.cache.lfu;
 
 import com.gft.cache.Cache;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -15,26 +15,19 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int maxSize;
 
-    private final double evictionFactor;
-
     private final int toStayAfterEvict;
 
     private final ConcurrentMap<K, ValueHolder<K, V>> cacheMap = new ConcurrentHashMap<>();
-
-    private FrequencyList<K> firstFrequency = new FrequencyList<>(0);
-
     private final ReadWriteLock cacheMapLock = new ReentrantReadWriteLock();
-
-    private final ReadWriteLock evictCache = new ReentrantReadWriteLock();
+    private final ReadWriteLock evictCacheLock = new ReentrantReadWriteLock();
+    private FrequencyList<K> firstFrequency = new FrequencyList<>(0);
 
     public LFUCache(int maxSize, double evictionFactor) {
         this.maxSize = maxSize;
-        this.evictionFactor = evictionFactor;
         this.toStayAfterEvict = (int) (maxSize * evictionFactor);
     }
 
     public void put(final K key, final V value) {
-
 
         while (true) {
             ValueHolder<K, V> oldValue = cacheMap.get(key);
@@ -129,7 +122,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private void evict() {
         try {
-            evictCache.writeLock().lock();
+            evictCacheLock.writeLock().lock();
             while (cacheMap.size() > toStayAfterEvict) {
                 K key = firstFrequency.getKey();
                 if (key == null) {
@@ -138,7 +131,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 internalEvict(key);
             }
         } finally {
-            evictCache.writeLock().unlock();
+            evictCacheLock.writeLock().unlock();
         }
 
     }
