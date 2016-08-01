@@ -4,9 +4,7 @@ import com.gft.cache.Cache;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -19,65 +17,70 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final double evictionFactor;
 
-    private final int toDeleteOnCacheFull;
+    private final int toStayAfterEvict;
 
-    private final ConcurrentMap<K, V> cacheMap = new ConcurrentHashMap<K, V>();
+    private final ConcurrentMap<K, ValueHolder<K, V>> cacheMap = new ConcurrentHashMap<>();
 
-    private FrequencyList<K> firstFrequency = new FrequencyList<K>(0);
+    private FrequencyList<K> firstFrequency = new FrequencyList<>(0);
 
-    private final Map<K, FrequencyList<K>> keyToFrequency = new HashMap<K, FrequencyList<K>>();
+    private final ReadWriteLock cacheMapLock = new ReentrantReadWriteLock();
 
-    private final ExecutorService service = Executors.newSingleThreadExecutor();
-
-   //private final ReadWriteLock mapLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock evictCache = new ReentrantReadWriteLock();
 
     public LFUCache(int maxSize, double evictionFactor) {
         this.maxSize = maxSize;
         this.evictionFactor = evictionFactor;
-        toDeleteOnCacheFull = (int) (maxSize * evictionFactor);
+        this.toStayAfterEvict = (int) (maxSize * evictionFactor);
     }
 
     public void put(final K key, final V value) {
 
-        Future addingToFrequencyTask =
-                service.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            V oldValue = cacheMap.get(key);
-                            if (oldValue!=null) {
-                                if(cacheMap.replace(key,oldValue,value)) {
-                                    //if we replaced value nothing should happend
-                                    return;
-                                }
-                            }
+
+        while (true) {
+            ValueHolder<K, V> oldValue = cacheMap.get(key);
+
+            if (oldValue != null) {
+                ValueHolder<K, V> newValue = new ValueHolder<>(key, value, oldValue.getFrequencyList());
+                if (cacheMap.replace(key, oldValue, newValue)) {
+                    //if we replaced value nothing should happen
+                    return;
+                } else {
+                    //The key either is deleted or moved to other frequency list
+                    continue;
+                }
+
+            }
+            if (cacheMap.size() == maxSize) {
+                evict();
+                continue;
+            }
 
 
-                            addToFrequencyListWith0Frequency(key);
-
-
-                                cacheMap.put(key, value);
-
-
-                        } catch (Throwable e) {
-                            e.printStackTrace();
-                        }
+            ValueHolder<K, V> newValue = new ValueHolder<>(key, value, firstFrequency);
+            ValueHolder<K, V> valueInCache = cacheMap.putIfAbsent(key, newValue);
+            if (valueInCache == null) {
+                try {
+                    cacheMapLock.writeLock().lock();
+                    if (newValue.equals(cacheMap.get(key))) {
+                        firstFrequency.addKey(key);
+                        return;
                     }
-                });
-        while (!addingToFrequencyTask.isDone()) {
-            ;
+                } finally {
+                    cacheMapLock.writeLock().unlock();
+                }
+
+            } else {
+                // The key was added by different thread
+            }
+
+
         }
 
 
     }
 
     public V get(final K key) {
-        service.submit(new Runnable() {
-            public void run() {
-                increaseFrequencyCounter(key);
-            }
-        });
-
-            return cacheMap.get(key);
+        return increaseFrequencyCounterAndGet(key);
 
     }
 
@@ -87,126 +90,73 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
 
     public void evict(final K key) {
-        service.submit(new Runnable() {
-            public void run() {
-                internalEvict(key);
+        internalEvict(key);
+
+
+    }
+
+
+    private V increaseFrequencyCounterAndGet(K key) {
+
+        while (true) {
+            ValueHolder<K, V> holder = cacheMap.get(key);
+            if (holder == null) {
+                //not found in map must be already removed
+                return null;
             }
-        });
+            try {
+                cacheMapLock.writeLock().lock();
 
-    }
 
+                FrequencyList<K> frequency = holder.getFrequencyList();
 
-    private void addToFrequencyListWith0Frequency(K key) {
-        if (cacheMap.size() == maxSize) {
-            evict();
-        }
-        keyToFrequency.put(key, firstFrequency);
-        firstFrequency.addKey(key);
-    }
+                FrequencyList<K> newFrequency = frequency.getFrequencyOneHigher();
+                ValueHolder<K, V> newHolder = new ValueHolder<>(key, holder.getValue(), newFrequency);
 
-    private void increaseFrequencyCounter(K key) {
-        FrequencyList<K> frequency = keyToFrequency.get(key);
-        if (frequency != null) {
-            FrequencyList<K> newFrequency = frequency.getFrequencyOneHigher();
-            newFrequency.addKey(key);
-            frequency.removeKey(key);
-            keyToFrequency.put(key, newFrequency);
+                if (cacheMap.replace(key, holder, newHolder)) {
+
+                    newFrequency.addKey(key);
+                    frequency.removeKey(key);
+                    return holder.getValue();
+                }
+
+            } finally {
+                cacheMapLock.writeLock().unlock();
+            }
         }
     }
 
 
     private void evict() {
-
-        for (int i = 0; i < toDeleteOnCacheFull; i++) {
-            K key = firstFrequency.getKey();
-            if (key == null) {
-                key = firstFrequency.getNext().getKey();
+        try {
+            evictCache.writeLock().lock();
+            while (cacheMap.size() > toStayAfterEvict) {
+                K key = firstFrequency.getKey();
+                if (key == null) {
+                    key = firstFrequency.getNext().getKey();
+                }
+                internalEvict(key);
             }
-            internalEvict(key);
+        } finally {
+            evictCache.writeLock().unlock();
         }
-
 
     }
 
 
     private void internalEvict(K key) {
-        FrequencyList<K> frequency = keyToFrequency.get(key);
-        if (frequency != null) {
-            frequency.removeKey(key);
-        } else {
-            throw new IllegalStateException("Frequency not found");
-        }
-        keyToFrequency.remove(key);
+        try {
+            cacheMapLock.writeLock().lock();
 
-        cacheMap.remove(key);
+            if (cacheMap.containsKey(key)) {
+                ValueHolder<K, V> value = cacheMap.remove(key);
+                value.getFrequencyList().removeKey(key);
+            }
+        } finally {
+            cacheMapLock.writeLock().unlock();
+        }
 
     }
 
 
-    private class FrequencyList<K> {
-        private final int frequemcy;
-
-        private FrequencyList<K> previous;
-
-        private FrequencyList<K> next;
-
-        private final Set<K> keys = new HashSet<K>();
-
-        public FrequencyList(int frequency) {
-            this.frequemcy = frequency;
-        }
-
-        public void addKey(K key) {
-            keys.add(key);
-        }
-
-        public void removeKey(K key) {
-            keys.remove(key);
-            if (keys.isEmpty() && frequemcy != 0) {
-                previous.setNext(next);
-                if (next != null) {
-                    next.setPrevious(previous);
-                }
-            }
-
-        }
-
-        public K getKey() {
-            if (keys.isEmpty()) {
-                return null;
-            }
-            return keys.iterator().next();
-        }
-
-        public FrequencyList<K> getFrequencyOneHigher() {
-            if (next == null || next.getFrequemcy() != frequemcy + 1) {
-                FrequencyList<K> oneHigerFrequency = new FrequencyList<K>(frequemcy + 1);
-                if (next != null) {
-                    next.setPrevious(oneHigerFrequency);
-                }
-                oneHigerFrequency.setPrevious(this);
-                oneHigerFrequency.setNext(next);
-                next = oneHigerFrequency;
-                return oneHigerFrequency;
-            } else {
-                return next;
-            }
-        }
-
-        public void setPrevious(FrequencyList<K> previous) {
-            this.previous = previous;
-        }
-
-        public void setNext(FrequencyList<K> next) {
-            this.next = next;
-        }
-
-        public int getFrequemcy() {
-            return frequemcy;
-        }
-
-        public FrequencyList<K> getNext() {
-            return next;
-        }
-    }
 }
