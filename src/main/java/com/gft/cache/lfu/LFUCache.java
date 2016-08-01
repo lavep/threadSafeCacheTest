@@ -3,10 +3,7 @@ package com.gft.cache.lfu;
 import com.gft.cache.Cache;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -24,7 +21,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int toDeleteOnCacheFull;
 
-    private final Map<K, V> cacheMap = new HashMap<K, V>();
+    private final ConcurrentMap<K, V> cacheMap = new ConcurrentHashMap<K, V>();
 
     private FrequencyList<K> firstFrequency = new FrequencyList<K>(0);
 
@@ -32,7 +29,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final ExecutorService service = Executors.newSingleThreadExecutor();
 
-    private final ReadWriteLock mapLock = new ReentrantReadWriteLock();
+   //private final ReadWriteLock mapLock = new ReentrantReadWriteLock();
 
     public LFUCache(int maxSize, double evictionFactor) {
         this.maxSize = maxSize;
@@ -46,20 +43,20 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 service.submit(new Runnable() {
                     public void run() {
                         try {
-
-                            if (cacheMap.containsKey(key)) {
-                                cacheMap.put(key, value);
-                                return;
+                            V oldValue = cacheMap.get(key);
+                            if (oldValue!=null) {
+                                if(cacheMap.replace(key,oldValue,value)) {
+                                    //if we replaced value nothing should happend
+                                    return;
+                                }
                             }
+
+
                             addToFrequencyListWith0Frequency(key);
-                            try {
 
-                                mapLock.writeLock().lock();
 
                                 cacheMap.put(key, value);
-                            } finally {
-                                mapLock.writeLock().unlock();
-                            }
+
 
                         } catch (Throwable e) {
                             e.printStackTrace();
@@ -79,12 +76,9 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 increaseFrequencyCounter(key);
             }
         });
-        try {
-            mapLock.readLock().lock();
+
             return cacheMap.get(key);
-        } finally {
-            mapLock.readLock().unlock();
-        }
+
     }
 
     public int size() {
@@ -143,12 +137,9 @@ public class LFUCache<K, V> implements Cache<K, V> {
             throw new IllegalStateException("Frequency not found");
         }
         keyToFrequency.remove(key);
-        try {
-            mapLock.writeLock().lock();
-            cacheMap.remove(key);
-        } finally {
-            mapLock.writeLock().unlock();
-        }
+
+        cacheMap.remove(key);
+
     }
 
 
