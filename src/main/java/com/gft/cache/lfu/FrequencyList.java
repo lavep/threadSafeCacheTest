@@ -1,17 +1,16 @@
 package com.gft.cache.lfu;
 
 
+import org.openjdk.jmh.annotations.Benchmark;
+
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 public  class FrequencyList<K> {
     private final int frequency;
-
-    private FrequencyList<K> previous;
-
-    private FrequencyList<K> next;
-
     private final Set<K> keys = new ConcurrentSkipListSet<>();
+    private FrequencyList<K> previous;
+    private FrequencyList<K> next;
 
     public FrequencyList(int frequency) {
         this.frequency = frequency;
@@ -39,6 +38,7 @@ public  class FrequencyList<K> {
         return keys.iterator().next();
     }
 
+    @Benchmark
     public FrequencyList<K> getFrequencyOneHigher() {
         if (next == null || next.getFrequency() != frequency + 1) {
             FrequencyList<K> oneHigerFrequency = new FrequencyList<>(frequency + 1);
@@ -58,15 +58,15 @@ public  class FrequencyList<K> {
         this.previous = previous;
     }
 
-    public void setNext(FrequencyList<K> next) {
-        this.next = next;
-    }
-
     public int getFrequency() {
         return frequency;
     }
 
     public FrequencyList<K> getNext() {
         return next;
+    }
+
+    public void setNext(FrequencyList<K> next) {
+        this.next = next;
     }
 }

@@ -1,6 +1,7 @@
 package com.gft.cache.lfu;
 
 import com.gft.cache.Cache;
+import org.openjdk.jmh.annotations.Benchmark;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -10,7 +11,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * Thread safe LFUCache
  */
-
 public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int maxSize;
@@ -27,6 +27,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
         this.toStayAfterEvict = (int) (maxSize * evictionFactor);
     }
 
+    @Benchmark
     public void put(final K key, final V value) {
 
         while (true) {
@@ -43,7 +44,8 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 }
 
             }
-            if (cacheMap.size() == maxSize) {
+
+            if (cacheMap.size() >= maxSize) {
                 evict();
                 continue;
             }
@@ -59,19 +61,20 @@ public class LFUCache<K, V> implements Cache<K, V> {
                         return;
                     }
                 } finally {
+
                     cacheMapLock.writeLock().unlock();
-                }
+                    }
 
             } else {
                 // The key was added by different thread
             }
-
 
         }
 
 
     }
 
+    @Benchmark
     public V get(final K key) {
         return increaseFrequencyCounterAndGet(key);
 
@@ -88,7 +91,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     }
 
-
+    @Benchmark
     private V increaseFrequencyCounterAndGet(K key) {
 
         while (true) {
@@ -99,7 +102,6 @@ public class LFUCache<K, V> implements Cache<K, V> {
             }
             try {
                 cacheMapLock.writeLock().lock();
-
 
                 FrequencyList<K> frequency = holder.getFrequencyList();
 
@@ -115,6 +117,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
             } finally {
                 cacheMapLock.writeLock().unlock();
+
             }
         }
     }
@@ -128,7 +131,10 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 if (key == null) {
                     key = firstFrequency.getNext().getKey();
                 }
-                internalEvict(key);
+                if (key != null) {
+                    internalEvict(key);
+                }
+
             }
         } finally {
             evictCacheLock.writeLock().unlock();
