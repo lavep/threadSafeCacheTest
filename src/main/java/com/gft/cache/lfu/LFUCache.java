@@ -1,10 +1,10 @@
 package com.gft.cache.lfu;
 
 import com.gft.cache.Cache;
-import org.openjdk.jmh.annotations.Benchmark;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -20,21 +20,23 @@ public class LFUCache<K, V> implements Cache<K, V> {
     private final ConcurrentMap<K, ValueHolder<K, V>> cacheMap = new ConcurrentHashMap<>();
     private final ReadWriteLock cacheMapLock = new ReentrantReadWriteLock();
     private final ReadWriteLock evictCacheLock = new ReentrantReadWriteLock();
-    private FrequencyList<K> firstFrequency = new FrequencyList<>(0);
+    private final ConcurrentSkipListMap<Integer, ConcurrentSkipListMap<K, Boolean>> frequencies = new ConcurrentSkipListMap<>();
+
 
     public LFUCache(int maxSize, double evictionFactor) {
         this.maxSize = maxSize;
         this.toStayAfterEvict = (int) (maxSize * evictionFactor);
     }
 
-    @Benchmark
+
     public void put(final K key, final V value) {
+
 
         while (true) {
             ValueHolder<K, V> oldValue = cacheMap.get(key);
 
             if (oldValue != null) {
-                ValueHolder<K, V> newValue = new ValueHolder<>(key, value, oldValue.getFrequencyList());
+                ValueHolder<K, V> newValue = new ValueHolder<>(key, value, oldValue.getFrequency());
                 if (cacheMap.replace(key, oldValue, newValue)) {
                     //if we replaced value nothing should happen
                     return;
@@ -50,23 +52,25 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 continue;
             }
 
+            try {
 
-            ValueHolder<K, V> newValue = new ValueHolder<>(key, value, firstFrequency);
-            ValueHolder<K, V> valueInCache = cacheMap.putIfAbsent(key, newValue);
-            if (valueInCache == null) {
-                try {
-                    cacheMapLock.writeLock().lock();
+                cacheMapLock.writeLock().lock();
+                ValueHolder<K, V> newValue = new ValueHolder<>(key, value, 0);
+
+                if (cacheMap.putIfAbsent(key, newValue) == null) {
+
                     if (newValue.equals(cacheMap.get(key))) {
-                        firstFrequency.addKey(key);
+                        addToFrequency(key, 0);
                         return;
                     }
-                } finally {
 
-                    cacheMapLock.writeLock().unlock();
-                    }
 
-            } else {
-                // The key was added by different thread
+                } else {
+                    // The key was added by different thread
+                }
+            } finally {
+
+                cacheMapLock.writeLock().unlock();
             }
 
         }
@@ -74,7 +78,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     }
 
-    @Benchmark
+
     public V get(final K key) {
         return increaseFrequencyCounterAndGet(key);
 
@@ -91,57 +95,99 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     }
 
-    @Benchmark
+
     private V increaseFrequencyCounterAndGet(K key) {
 
-        while (true) {
-            ValueHolder<K, V> holder = cacheMap.get(key);
+
+        ValueHolder<K, V> holder = cacheMap.get(key);
+        if (holder == null) {
+            //not found in map must be already removed
+            return null;
+        }
+        try {
+            cacheMapLock.writeLock().lock();
+            holder = cacheMap.get(key);
             if (holder == null) {
                 //not found in map must be already removed
                 return null;
             }
-            try {
-                cacheMapLock.writeLock().lock();
 
-                FrequencyList<K> frequency = holder.getFrequencyList();
 
-                FrequencyList<K> newFrequency = frequency.getFrequencyOneHigher();
-                ValueHolder<K, V> newHolder = new ValueHolder<>(key, holder.getValue(), newFrequency);
+            int oldFrequency = holder.getFrequency();
+            int newFrequency = oldFrequency + 1;
+            ValueHolder<K, V> newHolder = new ValueHolder<>(key, holder.getValue(), holder.getFrequency() + 1);
 
-                if (cacheMap.replace(key, holder, newHolder)) {
+            cacheMap.replace(key, newHolder);
+            addToFrequency(key, newFrequency);
+            removeFromFrequency(key, oldFrequency);
+            return holder.getValue();
+        } finally {
+            cacheMapLock.writeLock().unlock();
 
-                    newFrequency.addKey(key);
-                    frequency.removeKey(key);
-                    return holder.getValue();
-                }
 
-            } finally {
-                cacheMapLock.writeLock().unlock();
-
-            }
         }
+
+
     }
 
 
     private void evict() {
         try {
+            int i = 0;
+
             evictCacheLock.writeLock().lock();
+
             while (cacheMap.size() > toStayAfterEvict) {
+                i++;
+                try {
+                    cacheMapLock.writeLock().lock();
+                    K key = frequencies.firstEntry().getValue().firstKey();
 
-                K key = firstFrequency.getKey();
-                if (key == null) {
-                    key = firstFrequency.getNext().getKey();
+                    if (key != null) {
+                        internalEvict(key);
+                    } else {
+                        System.out.println(i + " " + cacheMap.size() + " cos nie tak " + key);
+                    }
+                    if (i > 10000) {
+                        System.out.println(i + " " + cacheMap.size() + " " + key);
+                    }
+                } finally {
+                    cacheMapLock.writeLock().unlock();
                 }
-                if (key != null) {
-                    internalEvict(key);
-                }
-
 
             }
         } finally {
             evictCacheLock.writeLock().unlock();
         }
 
+    }
+
+    private void addToFrequency(K key, int frequency) {
+        try {
+            cacheMapLock.writeLock().lock();
+            if (frequencies.containsKey(frequency)) {
+                frequencies.get(frequency).put(key, Boolean.TRUE);
+            } else {
+                ConcurrentSkipListMap<K, Boolean> currentFrequency = new ConcurrentSkipListMap<>();
+                currentFrequency.put(key, Boolean.TRUE);
+                frequencies.put(frequency, currentFrequency);
+            }
+        } finally {
+            cacheMapLock.writeLock().unlock();
+        }
+    }
+
+    private void removeFromFrequency(K key, int frequency) {
+        try {
+            cacheMapLock.writeLock().lock();
+            ConcurrentSkipListMap<K, Boolean> currentFrequency = frequencies.get(frequency);
+            currentFrequency.remove(key);
+            if (currentFrequency.isEmpty()) {
+                frequencies.remove(frequency);
+            }
+        } finally {
+            cacheMapLock.writeLock().unlock();
+        }
     }
 
 
@@ -151,13 +197,13 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
             if (cacheMap.containsKey(key)) {
                 ValueHolder<K, V> value = cacheMap.remove(key);
-                value.getFrequencyList().removeKey(key);
+                removeFromFrequency(key, value.getFrequency());
+            } else {
+                throw new IllegalStateException("Key not foudn " + key);
             }
         } finally {
             cacheMapLock.writeLock().unlock();
         }
 
     }
-
-
 }

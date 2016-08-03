@@ -14,6 +14,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 
@@ -28,7 +29,7 @@ public class JMHLFUCacheTest {
 
     @Test
     public void
-    launchBenchmark() throws Exception {
+    launchBenchmarkRead() throws Exception {
 
         Options opt = new OptionsBuilder()
                 // Specify which benchmarks to run.
@@ -51,6 +52,33 @@ public class JMHLFUCacheTest {
 
         new Runner(opt).run();
     }
+
+    @Test
+    public void
+    launchBenchmarkRand() throws Exception {
+
+        Options opt = new OptionsBuilder()
+                // Specify which benchmarks to run.
+                // You can be more specific if you'd like to run only one benchmark per test.
+                .include(this.getClass().getName() + ".*Rand*")
+                // Set the following options as needed
+                .mode(Mode.Throughput)
+                .timeUnit(TimeUnit.SECONDS)
+                .warmupTime(TimeValue.seconds(1))
+                .warmupIterations(1)
+                .measurementTime(TimeValue.seconds(2))
+                .measurementIterations(3)
+                .threads(50)
+                .forks(2)
+                .shouldFailOnError(true)
+                .shouldDoGC(true)
+                //.jvmArgs("-XX:+UnlockDiagnosticVMOptions", "-XX:+PrintInlining")
+                //.addProfiler(WinPerfAsmProfiler.class)
+                .build();
+
+        new Runner(opt).run();
+    }
+
 
 
     @Benchmark
@@ -169,9 +197,22 @@ public class JMHLFUCacheTest {
     }
 
     private Integer getRand() {
-        Random rand = new Random();
-        return rand.nextInt(1000);
+//        Random random=new Random();
+//        return random.nextInt(1000);
+        return ThreadLocalRandom.current().nextInt(0, 1000);
     }
+
+    @Benchmark
+    public Integer getRandIntTest() {
+        Random random = new Random();
+        return random.nextInt(1000);
+    }
+
+    @Benchmark
+    public Integer getRandThreadLocalIntTest() {
+        return ThreadLocalRandom.current().nextInt(0, 1000);
+    }
+
 
     private String getValue(int key) {
         return "value" + key;

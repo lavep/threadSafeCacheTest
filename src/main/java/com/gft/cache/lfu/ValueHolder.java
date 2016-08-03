@@ -1,18 +1,17 @@
 package com.gft.cache.lfu;
 
 
-public  class ValueHolder<K, V> {
+public class ValueHolder<K, V> implements Comparable<ValueHolder<K, V>> {
     private final K key;
 
     private final V value;
 
-    private final FrequencyList<K> frequencyList;
+    private final int frequency;
 
-
-    public ValueHolder(K key, V value, FrequencyList<K> frequencyList) {
+    public ValueHolder(K key, V value, int frequency) {
         this.key = key;
         this.value = value;
-        this.frequencyList = frequencyList;
+        this.frequency = frequency;
     }
 
     public K getKey() {
@@ -23,8 +22,8 @@ public  class ValueHolder<K, V> {
         return value;
     }
 
-    public FrequencyList<K> getFrequencyList() {
-        return frequencyList;
+    public Integer getFrequency() {
+        return frequency;
     }
 
     @Override
@@ -35,7 +34,7 @@ public  class ValueHolder<K, V> {
         if (!(o instanceof ValueHolder)) {
             return false;
         }
-        if (((ValueHolder) o).getFrequencyList() != frequencyList) {
+        if (((ValueHolder) o).getFrequency() != frequency) {
             return false;
         }
 
@@ -45,4 +44,9 @@ public  class ValueHolder<K, V> {
         return ((ValueHolder) o).getValue().equals(value);
     }
 
+
+    @Override
+    public int compareTo(ValueHolder<K, V> o) {
+        return o.getFrequency().compareTo(o.getFrequency());
+    }
 }
