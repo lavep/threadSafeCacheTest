@@ -15,21 +15,6 @@ public class ValueHolder<K, V> implements Comparable<ValueHolder<K, V>> {
         this.key = key;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        ValueHolder<?, ?> that = (ValueHolder<?, ?>) o;
-
-        return key.equals(that.key);
-
-    }
-
-    @Override
-    public int hashCode() {
-        return key.hashCode();
-    }
 
     public V getValue() {
         return value;
@@ -43,8 +28,8 @@ public class ValueHolder<K, V> implements Comparable<ValueHolder<K, V>> {
         return key;
     }
 
-    public void increaseFrequency() {
-        frequency.incrementAndGet();
+    public int increaseFrequency() {
+        return frequency.incrementAndGet();
     }
 
     public Integer getFrequency() {

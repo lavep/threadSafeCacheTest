@@ -59,7 +59,7 @@ public class JMHLFUCacheTest {
         new Runner(opt).run();
     }
 
-    @Test
+    // @Test
     public void
     launchBenchmarkRand() throws Exception {
 
