@@ -31,7 +31,9 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
 
     public void put(final K key, final V value) {
-
+        if (cacheMap.containsKey(key)) {
+            return;
+        }
 
         if (maxSize <= cacheMap.size()) {
             evict();
@@ -65,6 +67,10 @@ public class LFUCache<K, V> implements Cache<K, V> {
     }
 
     public V get(final K key) {
+        if (!cacheMap.containsKey(key)) {
+            return null;
+        }
+
         try {
             keysSortedLock.writeLock().lock();
             if (cacheMap.containsKey(key)) {

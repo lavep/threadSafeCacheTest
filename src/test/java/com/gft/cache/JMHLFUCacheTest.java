@@ -24,7 +24,7 @@ public class JMHLFUCacheTest {
 
     private final static int cacheSize = 100000;
 
-    private final static int radnUpTo = 500000;
+    private final static int radnUpTo = 200000;
 
     private final float evictFactor = 0.75f;
 
