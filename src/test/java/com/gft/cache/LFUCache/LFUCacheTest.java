@@ -20,7 +20,7 @@ public class LFUCacheTest {
 
     @Test
     public void simpleAddTest() {
-        Cache<Integer, String> cache = new LFUCache(4, 0.5);
+        Cache<Integer, String> cache = new LFUCache(4, 0.5f);
         cache.put(1, "test1");
         cache.put(2, "test2");
         Assert.assertEquals(2, cache.size());
@@ -47,6 +47,8 @@ public class LFUCacheTest {
         Assert.assertEquals("test1", cache.get(1));
         Assert.assertEquals("test2", cache.get(2));
         Assert.assertEquals("test5", cache.get(5));
+        cache.put(3, "test3");
+        Assert.assertEquals(3, cache.size());
     }
 
 
@@ -55,7 +57,7 @@ public class LFUCacheTest {
     @Test
 
     public void multiThreaded() throws InterruptedException {
-        final Cache<Integer, String> cache = new LFUCache(100, 0.5);
+        final Cache<Integer, String> cache = new LFUCache(100, 0.5f);
         ExecutorService executor = Executors.newFixedThreadPool(50);
         final CountDownLatch latch=new CountDownLatch(50);
         for (int i = 0; i < 15; i++) {

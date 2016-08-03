@@ -22,10 +22,16 @@ import java.util.concurrent.TimeUnit;
 public class JMHLFUCacheTest {
 
 
-    private Cache<Integer, String> lfuCache = new LFUCache(100, 0.5);
+    private final static int cacheSize = 100000;
+
+    private final static int radnUpTo = 500000;
+
+    private final float evictFactor = 0.75f;
+
+    private Cache<Integer, String> lfuCache = new LFUCache(cacheSize, evictFactor);
 
 
-    private Cache<Integer, String> lruCache = new LRUCache(100, 0.5f);
+    private Cache<Integer, String> lruCache = new LRUCache(cacheSize, evictFactor);
 
     @Test
     public void
@@ -205,7 +211,7 @@ public class JMHLFUCacheTest {
     @Benchmark
     public Integer getRandIntTest() {
         Random random = new Random();
-        return random.nextInt(1000);
+        return random.nextInt(radnUpTo);
     }
 
     @Benchmark
