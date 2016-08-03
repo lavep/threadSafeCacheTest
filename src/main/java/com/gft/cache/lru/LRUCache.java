@@ -12,8 +12,8 @@ public class LRUCache <K, V> implements Cache<K, V> {
 
     private CachedLinkedHashMap<K,V> cachedItems;
 
-    public LRUCache(final int maxSize, float evictionFactor) {
-        cachedItems=new CachedLinkedHashMap<K, V>(maxSize,evictionFactor);
+    public LRUCache(final int maxSize) {
+        cachedItems = new CachedLinkedHashMap<K, V>(maxSize);
     }
 
     public synchronized void put(K key, V value) {
@@ -35,8 +35,9 @@ public class LRUCache <K, V> implements Cache<K, V> {
 
     private class CachedLinkedHashMap<K,V> extends LinkedHashMap<K,V> {
         private final int maxCacheSize;
-        public CachedLinkedHashMap(final int maxSize, float evictionFactor) {
-            super(maxSize,evictionFactor,true);
+
+        public CachedLinkedHashMap(final int maxSize) {
+            super(maxSize, 0.75f, true);
             this.maxCacheSize=maxSize;
         }
         protected boolean removeEldestEntry(Map.Entry eldest) {

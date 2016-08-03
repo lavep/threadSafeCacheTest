@@ -24,14 +24,13 @@ public class JMHLFUCacheTest {
 
     private final static int cacheSize = 100000;
 
-    private final static int radnUpTo = 200000;
-
-    private final float evictFactor = 0.75f;
-
-    private Cache<Integer, String> lfuCache = new LFUCache(cacheSize, evictFactor);
+    private final static int radnUpTo = 400000;
 
 
-    private Cache<Integer, String> lruCache = new LRUCache(cacheSize, evictFactor);
+    private Cache<Integer, String> lfuCache = new LFUCache(cacheSize);
+
+
+    private Cache<Integer, String> lruCache = new LRUCache(cacheSize);
 
     @Test
     public void
@@ -48,7 +47,7 @@ public class JMHLFUCacheTest {
                 .warmupIterations(1)
                 .measurementTime(TimeValue.seconds(2))
                 .measurementIterations(3)
-                .threads(50)
+                .threads(40)
                 .forks(2)
                 .shouldFailOnError(true)
                 .shouldDoGC(true)

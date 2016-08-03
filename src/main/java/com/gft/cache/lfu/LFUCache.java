@@ -2,9 +2,10 @@ package com.gft.cache.lfu;
 
 import com.gft.cache.Cache;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -15,18 +16,17 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int maxSize;
 
-    private final int toStayAfterEvict;
 
-    private final ConcurrentNavigableMap<K, ValueHolder<K, V>> cacheMap = new ConcurrentSkipListMap<>();
+    private final Map<K, ValueHolder<K, V>> cacheMap;
 
-    private final ConcurrentNavigableMap<Integer, ConcurrentNavigableMap<K, ValueHolder<K, V>>> frequencies = new ConcurrentSkipListMap<>();
+    private final NavigableMap<Integer, Map<K, ValueHolder<K, V>>> frequencies = new TreeMap<>();
 
     private final ReadWriteLock keysSortedLock = new ReentrantReadWriteLock();
 
-    public LFUCache(int maxSize, float evictionFactor) {
-        this.maxSize = maxSize;
-        this.toStayAfterEvict = (int) (maxSize * evictionFactor);
 
+    public LFUCache(int maxSize) {
+        this.maxSize = maxSize;
+        cacheMap = new HashMap<>(maxSize);
     }
 
 
@@ -35,15 +35,14 @@ public class LFUCache<K, V> implements Cache<K, V> {
             return;
         }
 
-        if (maxSize <= cacheMap.size()) {
-            evict();
-        }
         try {
             keysSortedLock.writeLock().lock();
+        if (maxSize <= cacheMap.size()) {
+            evictLeastFrequentUsed();
+        }
+
             if (!cacheMap.containsKey(key)) {
-
                 ValueHolder holder = new ValueHolder<K, V>(key, value);
-
                 cacheMap.put(key, holder);
                 addToFrequency(holder);
 
@@ -61,9 +60,14 @@ public class LFUCache<K, V> implements Cache<K, V> {
     }
 
     private void addToFrequency(ValueHolder<K, V> holder) {
-        ConcurrentNavigableMap<K, ValueHolder<K, V>> map = frequencies.getOrDefault(holder.getFrequency(), new ConcurrentSkipListMap<>());
-        map.put(holder.getKey(), holder);
-        frequencies.put(holder.getFrequency(), map);
+
+        if (frequencies.containsKey(holder.getFrequency())) {
+            frequencies.get(holder.getFrequency()).put(holder.getKey(), holder);
+        } else {
+            Map<K, ValueHolder<K, V>> map = new HashMap<>();
+            map.put(holder.getKey(), holder);
+            frequencies.put(holder.getFrequency(), map);
+        }
     }
 
     public V get(final K key) {
@@ -103,7 +107,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
     }
 
     private void removeFromFrequency(int oldFrequency, ValueHolder<K, V> valueHolder) {
-        ConcurrentNavigableMap<K, ValueHolder<K, V>> frequency = frequencies.get(oldFrequency);
+        Map<K, ValueHolder<K, V>> frequency = frequencies.get(oldFrequency);
         frequency.remove(valueHolder.getKey());
         if (frequency.isEmpty()) {
             frequencies.remove(oldFrequency);
@@ -127,26 +131,13 @@ public class LFUCache<K, V> implements Cache<K, V> {
     }
 
 
-    private void evict() {
+    private void evictLeastFrequentUsed() {
+        Map.Entry<Integer, Map<K, ValueHolder<K, V>>> frequencyEntry = frequencies.firstEntry();
+        Map<K, ValueHolder<K, V>> frequency = frequencyEntry.getValue();
 
-        try {
-            keysSortedLock.writeLock().lock();
-            while (cacheMap.size() > toStayAfterEvict) {
-
-                Map.Entry<Integer, ConcurrentNavigableMap<K, ValueHolder<K, V>>> frequencyEntry = frequencies.firstEntry();
-                ConcurrentNavigableMap<K, ValueHolder<K, V>> frequency = frequencyEntry.getValue();
-                Map.Entry<K, ValueHolder<K, V>> value = frequency.pollFirstEntry();
-                if (frequency.isEmpty()) {
-                    frequencies.remove(frequencyEntry.getKey());
-                }
-                cacheMap.remove(value.getKey());
-
-
-            }
-        } finally {
-            keysSortedLock.writeLock().unlock();
-
-        }
+        K key = frequency.entrySet().iterator().next().getKey();
+        frequency.remove(key);
+        cacheMap.remove(key);
     }
 
 

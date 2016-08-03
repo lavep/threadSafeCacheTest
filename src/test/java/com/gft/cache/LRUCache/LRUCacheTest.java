@@ -1,7 +1,6 @@
 package com.gft.cache.LRUCache;
 
 import com.gft.cache.Cache;
-import com.gft.cache.lfu.LFUCache;
 import com.gft.cache.lru.LRUCache;
 import org.junit.Assert;
 import org.junit.Test;
@@ -18,7 +17,7 @@ public class LRUCacheTest {
 
     @Test
     public void simpleAddTest() {
-        Cache<Integer, String> cache = new LRUCache(4, 0.5f);
+        Cache<Integer, String> cache = new LRUCache(4);
         cache.put(1, "test1");
         cache.put(2, "test2");
         Assert.assertEquals(2, cache.size());
@@ -49,7 +48,7 @@ public class LRUCacheTest {
 
     @Test
     public void multiThreaded() throws InterruptedException {
-        final Cache<Integer, String> cache = new LRUCache(4, 0.5f);
+        final Cache<Integer, String> cache = new LRUCache(4);
         ExecutorService executor = Executors.newFixedThreadPool(300);
 
         for (int i = 0; i < 300; i++) {
@@ -84,7 +83,7 @@ public class LRUCacheTest {
 
     @Test
     public void multiThreaded2() throws InterruptedException {
-        final Cache<Integer, String> cache = new LRUCache(4, 0.5f);
+        final Cache<Integer, String> cache = new LRUCache(4);
         ExecutorService executor = Executors.newFixedThreadPool(1300);
         cache.put(0,"test0");
         cache.put(1,"test1");
