@@ -127,6 +127,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
         try {
             evictCacheLock.writeLock().lock();
             while (cacheMap.size() > toStayAfterEvict) {
+
                 K key = firstFrequency.getKey();
                 if (key == null) {
                     key = firstFrequency.getNext().getKey();
@@ -134,6 +135,7 @@ public class LFUCache<K, V> implements Cache<K, V> {
                 if (key != null) {
                     internalEvict(key);
                 }
+
 
             }
         } finally {

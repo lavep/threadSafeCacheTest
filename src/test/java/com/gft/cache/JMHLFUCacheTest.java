@@ -74,12 +74,86 @@ public class JMHLFUCacheTest {
     }
 
     @Benchmark
+    public String read2WriteLFU() {
+        int rand2 = getRand();
+        lfuCache.get(rand2);
+        int rand = getRand();
+        lfuCache.put(rand, getValue(rand));
+
+        int rand3 = getRand();
+        return lfuCache.get(rand3);
+    }
+
+    @Benchmark
+    public String read4WriteLFU() {
+        for (int i = 0; i <= 2; i++) {
+            int rand2 = getRand();
+            lfuCache.get(rand2);
+        }
+        int rand = getRand();
+        lfuCache.put(rand, getValue(rand));
+
+        int rand3 = getRand();
+        return lfuCache.get(rand3);
+    }
+
+
+    @Benchmark
+    public String read10WriteLFU() {
+        for (int i = 0; i <= 9; i++) {
+            int rand2 = getRand();
+            lfuCache.get(rand2);
+        }
+        int rand = getRand();
+        lfuCache.put(rand, getValue(rand));
+
+        int rand3 = getRand();
+        return lfuCache.get(rand3);
+    }
+
+
+    @Benchmark
     public String readWriteLRU() {
         int rand = getRand();
         lruCache.put(rand, getValue(rand));
         int rand2 = getRand();
         return lruCache.get(rand2);
     }
+
+    @Benchmark
+    public String read2WriteLRU() {
+        int rand = getRand();
+        lruCache.get(rand);
+        rand = getRand();
+        lruCache.put(rand, getValue(rand));
+        int rand2 = getRand();
+        return lruCache.get(rand2);
+    }
+
+    @Benchmark
+    public String read4WriteLRU() {
+        for (int i = 0; i <= 2; i++) {
+            int rand = getRand();
+            lruCache.get(rand);
+        }
+        int rand = getRand();
+        lruCache.put(rand, getValue(rand));
+        int rand2 = getRand();
+        return lruCache.get(rand2);
+    }
+
+    @Benchmark
+    public String read10WriteLRU() {
+        for (int i = 0; i <= 9; i++) {
+            int rand = getRand();
+            lruCache.get(rand);
+        }
+        int rand = getRand();
+        lruCache.put(rand, getValue(rand));
+        int rand2 = getRand();
+        return lruCache.get(rand2);
+    }
+
 
 
     @Benchmark

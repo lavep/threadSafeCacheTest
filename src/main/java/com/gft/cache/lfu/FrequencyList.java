@@ -3,12 +3,12 @@ package com.gft.cache.lfu;
 
 import org.openjdk.jmh.annotations.Benchmark;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentSkipListMap;
 
-public  class FrequencyList<K> {
+public class FrequencyList<K> {
     private final int frequency;
-    private final Set<K> keys = new ConcurrentSkipListSet<>();
+    private final ConcurrentSkipListMap<K, Boolean> keys = new ConcurrentSkipListMap<>();
     private FrequencyList<K> previous;
     private FrequencyList<K> next;
 
@@ -17,7 +17,7 @@ public  class FrequencyList<K> {
     }
 
     public void addKey(K key) {
-        keys.add(key);
+        keys.put(key, Boolean.TRUE);
     }
 
     public void removeKey(K key) {
@@ -32,10 +32,15 @@ public  class FrequencyList<K> {
     }
 
     public K getKey() {
-        if (keys.isEmpty()) {
+        try {
+            if (keys.isEmpty()) {
+                return null;
+            }
+            return keys.firstKey();
+        } catch (NoSuchElementException e) {
             return null;
+            // do nothing something had to delete the key between check and return
         }
-        return keys.iterator().next();
     }
 
     @Benchmark
