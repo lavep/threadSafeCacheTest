@@ -7,6 +7,9 @@ public class FrequencyList<K, V> {
     private Frequency<K, V> firstFrequency = null;
 
     public synchronized void moveToNextFrequency(ValueHolder<K, V> valueHolder) {
+        if (valueHolder.getDeleted()) {
+            return;
+        }
         Frequency<K, V> oldFrequency = valueHolder.getFrequencyObject();
         Frequency nextFrequencyCount = valueHolder.increaseFrequency();
         if (oldFrequency.isEmpty()) {

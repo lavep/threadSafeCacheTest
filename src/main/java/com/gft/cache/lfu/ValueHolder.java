@@ -1,14 +1,19 @@
 package com.gft.cache.lfu;
 
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class ValueHolder<K, V> {
 
     private final K key;
 
     private V value;
 
-
     private Frequency frequencyObject;
+
+    private AtomicBoolean deleted = new AtomicBoolean(false);
+
+    private AtomicBoolean ready = new AtomicBoolean(false);
 
     public ValueHolder(K key, V value) {
 
@@ -47,6 +52,7 @@ public class ValueHolder<K, V> {
     public void setZeroFrequency(Frequency<K, V> frequency) {
         frequencyObject = frequency;
         frequencyObject.add(this);
+        ready.set(true);
     }
 
     public Frequency getFrequencyObject() {
@@ -58,4 +64,17 @@ public class ValueHolder<K, V> {
     }
 
 
+    public void deleted() {
+        deleted.set(true);
+        frequencyObject = null;
+    }
+
+    public boolean getDeleted() {
+        return deleted.get();
+    }
+
+    public void waitTillActive() {
+        while (!ready.get()) {
+        }
+    }
 }

@@ -72,7 +72,9 @@ public class Frequency<K, V> {
 
     public ValueHolder<K, V> poll() {
         Map.Entry<K, ValueHolder<K, V>> entry = values.entrySet().iterator().next();
-        values.remove(entry.getKey());
-        return entry.getValue();
+        ValueHolder<K, V> value = entry.getValue();
+        value.deleted();
+        values.remove(value.getKey());
+        return value;
     }
 }
