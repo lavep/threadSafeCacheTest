@@ -1,13 +1,14 @@
 package com.gft.cache.lfu;
 
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-public class ValueHolder<K, V> implements Comparable<ValueHolder<K, V>> {
+public class ValueHolder<K, V> {
 
     private final K key;
-    private final AtomicInteger frequency = new AtomicInteger(0);
+
     private V value;
+
+
+    private Frequency frequencyObject;
 
     public ValueHolder(K key, V value) {
 
@@ -28,18 +29,32 @@ public class ValueHolder<K, V> implements Comparable<ValueHolder<K, V>> {
         return key;
     }
 
-    public int increaseFrequency() {
-        return frequency.incrementAndGet();
+    public Frequency increaseFrequency() {
+
+        Frequency nextFrequency = frequencyObject.getNextFrequency();
+        if (nextFrequency == null || nextFrequency.getFrequency() != frequencyObject.getFrequency() + 1) {
+            nextFrequency = new Frequency<K, V>(frequencyObject.getFrequency() + 1, frequencyObject, frequencyObject.getNextFrequency());
+
+        }
+        frequencyObject.remove(this);
+        nextFrequency.add(this);
+        frequencyObject = nextFrequency;
+        return frequencyObject;
+
+
+    }
+
+    public void setZeroFrequency(Frequency<K, V> frequency) {
+        frequencyObject = frequency;
+        frequencyObject.add(this);
+    }
+
+    public Frequency getFrequencyObject() {
+        return frequencyObject;
     }
 
     public Integer getFrequency() {
-        return frequency.get();
-    }
-
-    @Override
-    public int compareTo(ValueHolder<K, V> o) {
-        return getFrequency().compareTo(o.getFrequency());
-
+        return frequencyObject.getFrequency();
     }
 
 
