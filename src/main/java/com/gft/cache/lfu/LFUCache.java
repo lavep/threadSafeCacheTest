@@ -4,8 +4,6 @@ import com.gft.cache.Cache;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Thread safe LFUCache
@@ -14,42 +12,29 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
     private final int maxSize;
 
-
     private final Map<K, ValueHolder<K, V>> cacheMap;
 
     private final FrequencyList<K, V> frequencyList = new FrequencyList<K, V>();
-
-    private final ReadWriteLock keysSortedLock = new ReentrantReadWriteLock();
-
 
     public LFUCache(int maxSize) {
         this.maxSize = maxSize;
         cacheMap = new HashMap<>(maxSize);
     }
 
-
     public void put(final K key, final V value) {
         if (cacheMap.containsKey(key)) {
             return;
         }
 
-        try {
-            //       keysSortedLock.writeLock().lock();
         if (maxSize <= cacheMap.size()) {
             evictLeastFrequentUsed();
         }
 
-            if (!cacheMap.containsKey(key)) {
-                ValueHolder holder = new ValueHolder<K, V>(key, value);
-                cacheMap.put(key, holder);
-                //addToFrequencyList(holder);
-                frequencyList.addToFrequencyList(holder);
+        if (!cacheMap.containsKey(key)) {
+            ValueHolder holder = new ValueHolder<K, V>(key, value);
+            cacheMap.put(key, holder);
+            frequencyList.addToFrequencyList(holder);
 
-            }
-        } finally
-
-        {
-            //       keysSortedLock.writeLock().unlock();
         }
 
         ValueHolder holder = cacheMap.getOrDefault(key, new ValueHolder<K, V>(key, value));
@@ -63,19 +48,15 @@ public class LFUCache<K, V> implements Cache<K, V> {
             return null;
         }
 
-        try {
-            //     keysSortedLock.writeLock().lock();
-            if (cacheMap.containsKey(key)) {
-                ValueHolder<K, V> valueHolder = cacheMap.get(key);
-                valueHolder.waitTillActive();
-                frequencyList.moveToNextFrequency(valueHolder);
-                return valueHolder.getValue();
+        ValueHolder<K, V> valueHolder = cacheMap.get(key);
+        if (valueHolder != null) {
 
-            } else {
-                return null;
-            }
-        } finally {
-            //    keysSortedLock.writeLock().unlock();
+            valueHolder.waitTillActive();
+            frequencyList.moveToNextFrequency(valueHolder);
+            return valueHolder.getValue();
+
+        } else {
+            return null;
         }
 
     }
@@ -86,7 +67,8 @@ public class LFUCache<K, V> implements Cache<K, V> {
 
 
     public void evict(final K key) {
-        //  Not supported yet
+        ValueHolder<K, V> holder = cacheMap.remove(key);
+        frequencyList.remove(holder);
     }
 
 
@@ -94,6 +76,4 @@ public class LFUCache<K, V> implements Cache<K, V> {
         K key = frequencyList.pollLeastUsed().getKey();
         cacheMap.remove(key);
     }
-
-
 }

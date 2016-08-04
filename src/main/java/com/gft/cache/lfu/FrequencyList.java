@@ -52,4 +52,23 @@ public class FrequencyList<K, V> {
 
     }
 
+    public synchronized void remove(ValueHolder valueHolder) {
+        if (valueHolder.getDeleted()) {
+            return;
+        }
+        Frequency<K, V> frequency = valueHolder.getFrequencyObject();
+        frequency.remove(valueHolder);
+
+        if (frequency.isEmpty()) {
+            Frequency next = frequency.getNextFrequency();
+            frequency.removeNode();
+            if (frequency == firstFrequency) {
+                firstFrequency = next;
+            }
+        }
+
+
+    }
+
+
 }

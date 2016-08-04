@@ -52,10 +52,6 @@ public class Frequency<K, V> {
         return frequency;
     }
 
-    public Frequency<K, V> getPrevFrequency() {
-        return prevFrequency;
-    }
-
     public void setPrevFrequency(Frequency<K, V> prevFrequency) {
         this.prevFrequency = prevFrequency;
     }
